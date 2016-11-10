@@ -1,0 +1,99 @@
+﻿#encoding=utf-8
+#188.2.135.5
+neName = ['DGRNC01','DGRNC02','DGRNC03','DGRNC04','DGRNC05','DGRNC06','DGRNC07','DGRNC08','DGRNC09','DGRNC10','DGRNC11','DGRNC12','DGRNC13','DGRNC14','DGRNC15','DGRNC16','DGRNC17','DGRNC18','DGRNC19','DGRNC20','DGRNC21','DGRNC22','DGRNC23','DGRNC24','DGRNC25','DGRNC26','DGRNC27','DGRNC28','DGRNC29','DGRNC30','DGRNC31','DGRNC32','DGRNC33','DGRNC34','DGRNC35','DGRNC36','DGRNC37','DGRNC38','DGRNC39','DGRNC40','DGRNC41','DGRNC42','DGRNC43','DGRNC44','DGRNC45','DGRNC46','DGRNC47','DGRNC48','DGRNC49','DGRNC50','DGRNC51','DGRNC52']
+output = []
+MMLlist = ['DEA TCELL','ACT TCELL','BLK TCELL','UBL TCELL']
+
+#secs = Time() -600
+#(year,mon,day,hour,minute) = LocalTime(secs)[0:5]
+for ne in neName
+    ClearMMLBuffer()
+    ConnectNE(ne)
+    #doMML = SendMML('LST OPTLOG:FIN=TRUE,MAX=1000,ST=%d&%d&%d&%d&%d&00,CMD=\"DEA BTS\";'%(year,mon,day,hour,minute))
+    for MMLtemp in MMLlist
+        doMML = SendMML('LST OPTLOG:FIN=TRUE,MAX=1000,CMD=\"%s\";'%(MMLtemp))
+            if doMML == 1
+                if MMLtemp.find('DEA') != -1 or MMLtemp.find('BLK') != -1
+                    OPTtemp = '闭塞'
+                else
+                    OPTtemp = '激活'
+                end
+                mml = GetMMLReport(-1)
+                p = ParseMMLRpt(mml)
+                rescod = GetResultCode(p)
+                if rescod == '0'
+                    i = GetRecordNum(p,0)
+                    k = 0
+                    Trecord = [[] for z in range(i)]
+                    while(k<i)
+                        Trecord[k].append(GetRowByIndex(p,0,k)[1])
+                        Trecord[k].append(GetRowByIndex(p,0,k)[6])
+                        #Trecord[k].append(GetRowByIndex(p,0,k)[10])  #改用name属性查找！！
+                        Trecord[k].append(GetAttrValueByName(p,0,"操作命令",k))
+						k = k + 1
+                    end
+                    j = 0
+                    DestroyMMLParser(p)
+                    while(j<i)
+                        output.append(OPTtemp)
+                        output.append(ne)
+                        output.append(Trecord[j][0])
+                        output.append(Trecord[j][1])
+                        Tbtsid = Trecord[j][2]
+                        MMLline = 'LST TCELL:LSTTYPE=BYCELLID,LSTFORMAT=HORIZONTAL,CELLID'
+                        #output.append('小区')
+						Tbtsid = Tbtsid.replace(' ','',20)
+						Tstart = Tbtsid.find('CELLID') + 7
+						Tend = len(Tbtsid) - 1
+						Tbts = Tbtsid[Tstart:Tend]
+						
+                        #if len(Tbts) > 4
+                        #    Tend = Tbts.find(',') - 1
+                        #    Tbts = Tbts[0:Tend]
+                        #end
+                        
+                        #if Tbts.isdigit()
+                        #if not Tbts.isdigit() and Tbts.find('=') != -1
+                        #    Tbts = Tbts.strip()
+						#	Tstart = Tbts.find('=') + 1
+						#	Tend = len(Tbts)
+						#	Tbts = Tbts[Tstart:Tend]
+						#end
+						
+						if Tbts.find(',') != -1
+							Tend = Tbts.find(',')
+							Tbts = Tbts[0:Tend]
+						end
+                            doMML = SendMML('%s=%s;'%(MMLline,Tbts))
+                            mml = GetMMLReport(-1)
+                            p = ParseMMLRpt(mml)
+                            Trecord1 = GetRecordNum(p,0)
+                            if doMML == 1 and Trecord1 <> 0
+                                output.append(GetRowByIndex(p,0,0)[1])
+                            else
+                                output.append(Tbts)
+                            end
+                        #else
+                        #    Tstart = Tbtsid.find('NAME=') + 6
+                        #    Tend = len(Tbtsid) - 2
+                        #    Tbts = Tbtsid[Tstart:Tend]
+                        #    output.append(Tbts)
+                        #end
+                        
+                        Itemp = 1
+                        for x in output
+                            Print ('%s'%(x),False)
+                            if Itemp < len(output)
+                                Print(',',False)
+                            end
+                        Itemp += 1
+                        end
+                        Print('')
+                        j += 1
+                        output = []
+                    end
+                    DestroyMMLParser(p)
+                end
+            end
+    end
+end

@@ -1,0 +1,104 @@
+﻿#encoding=utf-8
+neName = ['DGM10B1','DGM10B2','DGM10B3','DGM12B1','DGM12B2','DGM13B1','DGM13B2','DGM14B1','DGM14B2','DGM17B1','DGM17B2','DGM17B3','DGM20B1','DGM20B2','DGM20B3','DGM20B4','DGM30B3','DGM30B4','DGM31B1','DGM31B2','DGM31B3','DGM31B4','DGM31B5','DGM33B1','DGB02','DGB03','DGB04']
+#neName = ['DGM31B1']
+output = []
+MMLlist = ['DEA BTS','ACT BTS','DEA GCELL','ACT GCELL']
+
+#secs = Time() -600
+#(year,mon,day,hour,minute) = LocalTime(secs)[0:5]
+for ne in neName
+    ConnectNE(ne)
+    #doMML = SendMML('LST OPTLOG:FIN=TRUE,MAX=1000,ST=%d&%d&%d&%d&%d&00,CMD=\"DEA BTS\";'%(year,mon,day,hour,minute))
+	for MMLtemp in MMLlist
+        doMML = SendMML('LST OPTLOG:FIN=TRUE,MAX=1000,CMD=\"%s\";'%(MMLtemp))
+            if doMML == 1
+                if MMLtemp.find('DEA') != -1
+                    OPTtemp = '闭塞'
+                else
+                    OPTtemp = '激活'
+                end
+                mml = GetMMLReport(-1)
+                p = ParseMMLRpt(mml)
+                rescod = GetResultCode(p)
+                if rescod == '0'
+                    i = GetRecordNum(p,0)
+                    k = 0
+                    Trecord = [[] for z in range(i)]
+                    while(k<i)
+                        Trecord[k].append(GetRowByIndex(p,0,k)[1])
+                        Trecord[k].append(GetRowByIndex(p,0,k)[6])
+                        Trecord[k].append(GetRowByIndex(p,0,k)[10])
+                        k = k + 1
+                    end
+                    j = 0
+                    DestroyMMLParser(p)
+                    while(j<i)
+                        output.append(OPTtemp)
+                        output.append(ne)
+                        output.append(Trecord[j][0])
+                        output.append(Trecord[j][1])
+                        Tbtsid = Trecord[j][2]
+						Tbtsid = Tbtsid.replace(' ','')
+						if Tbtsid.find('ID=') != -1
+							Tstart = Tbisid.find('ID=') + 3
+							Tend = len(Tbtsid) - 1
+							Tbts = Tbtsid[Tstart:Tend]
+						else
+							Tstart = Tbtsid.find('NAME=') + 6
+							Tend = len(Tbtsid) - 1
+							Tbts = Tbtsid[Tstart:Tend]
+						end
+						if Tbts.find(',') != 1
+							Tend = Tbts.find(',')
+							Tbts = Tbts[0:Tend]
+						end
+						if Tbts.find('"') != 1
+							Tend = Tbts.find('"')
+							Tbts = Tbts[0:Tend]
+						end
+                        if MMLtemp.find('BTS') != -1
+                            MMLline = 'LST BTS:LSTTYPE=BYBTSID,BTSID'
+                            output.append('基站')
+                        else
+                            MMLline = 'LST GCELL:IDTYPE=BYID,CELLID'
+                            output.append('小区')
+                        end
+							#Tend = Tbtsid.find(';') - 1
+							#Tbts = Tbtsid[Tstart:Tend]
+							#if Tbts.find(',') <> -1
+							#	Tend = Tbts.find(',') - 1
+							#	Tbts = Tbts[0:Tend]
+							#end
+                        if Tbts.isdigit()	#Tbts全为数字，是按小区ID外理
+                            doMML = SendMML('%s=%s;'%(MMLline,Tbts))
+							mml = GetMMLReport(-1)
+                            p = ParseMMLRpt(mml)
+							Trec = GetRecordNum(p,0)
+                            if doMML == 1 and Trec <> 0
+                                output.append(GetRowByIndex(p,0,0)[1])
+                            else
+                                output.append(Tbts)
+                            end
+                        else	#不全为数字时，按小区名的格式合新获取小区NAME
+                            output.append(Tbts)
+                        end
+						if Tbts.find(',') <> -1
+						    continue
+						end
+                        Itemp = 1
+                        for x in output
+                            Print ('%s'%(x),False)
+                            if Itemp < len(output)
+                                Print(',',False)
+                            end
+                        Itemp += 1
+                        end
+                        Print("")
+                        j += 1
+                        output = []
+                    end
+                    DestroyMMLParser(p)
+                end
+            end
+    end
+end
